@@ -1,0 +1,142 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+
+<meta http-equiv="Content-Type" content="text/html; charset=EUC-JP">
+<script src="http://api.its-mo.com/cgi/loader.cgi?key=JSZ3d80a0c3deff&ver=2.0&api=zdcmap.js,search.js,shape.js&enc=SJIS&force=1" type="text/javascript"></script>
+<script src="hex_v3_core.js" type="text/javascript"></script>
+<script src="hex_zmap.js" type="text/javascript"></script>
+<style type="text/css">
+</style>
+<script type="text/javascript">
+//<![CDATA[
+    var map, msg, lat = 35.6778614, lon = 139.7703167, arrmrk = [];
+
+    var pg;
+
+    function loadMap(){
+        var latlon  = new ZDC.LatLon(lat, lon);
+        map = new ZDC.Map(document.getElementById('ZMap'),{
+            latlon: latlon,
+            zoom: 10
+        });
+
+         /* 地図をクリックしたときの動作 */
+        ZDC.addListener(map, ZDC.MAP_CLICK, getClickLatLon);
+
+        //メッセージ表示
+        msg = new ZDC.MsgInfo(latlon, {offset: ZDC.Pixel(0, -18)});
+        map.addWidget(msg);
+    };
+
+    function exec(){
+        /* 緯度経度で周辺のPOI探索を実行 */
+        /* ジャンルコード（コンビニ：0014000180） */
+        var searchWord = document.getElementById("searchWord").value;
+        sendDummyRequest(searchWord);
+        ZDC.Search.getPoiByLatLon({
+            latlon: new ZDC.LatLon(map.getLatLon().lat, map.getLatLon().lon),
+            //word: searchWord,
+           genrecode: '0014000180',
+            limit: '0,30'
+        },function(status, res) {
+            if (status.code == '000') {
+                /* 取得成功 */
+                markerDisp(status, res);
+            } else {
+                /* 取得失敗 */
+                alert(status.text);
+            }
+        });
+    };
+	
+	function sendDummyRequest(searchWord) {
+		var latlon =  map.getLatLon();
+		var zone = GeoHex.getZoneByLocation(latlon.lat, latlon.lon, 8);
+		var url = "./dummy.html?word="  + searchWord + "&level8_x=" + zone.x + "&level8_y=" + zone.y;
+		var xhr = new XMLHttpRequest();
+ 		xhr.open('GET', url, true);
+ 		xhr.onreadystatechange = function(){
+			if (xhr.readyState === 4 && xhr.status === 200){
+				//do nothing
+			}
+		};
+		xhr.send(null);
+	}
+
+    function markerDisp(status, res) {
+        /* マーカを作成 */
+        var items = res.item;
+        var latlons = [];
+        for (var i=0, j=items.length; i<j; i++) {
+
+            var itemlatlon = new ZDC.LatLon(items[i].poi.latlon.lat, items[i].poi.latlon.lon);
+
+            latlons.push(itemlatlon);
+
+            var mrk = new ZDC.Marker(itemlatlon);
+            map.addWidget(mrk);
+            arrmrk.push(mrk);
+
+            /* マーカをクリックしたときの動作 */
+            ZDC.bind(mrk, ZDC.MARKER_CLICK, items[i].poi, markerClick); 
+
+        }
+
+        /* 地点が全て表示できる縮尺レベルを取得 */
+        //var adjust = map.getAdjustZoom(latlons);
+        //map.moveLatLon(adjust.latlon);
+        //map.setZoom(adjust.zoom);
+    };
+
+    function markerClick() {
+        var labelhtml;
+        labelhtml = '<div><font size = "-1"><div><b>' + this.text + '</b></div>';
+        labelhtml += '<table><tr><td>\u3012' + this.zipcode + ' ' + this.addressText + '</td></tr>';
+        labelhtml += '<tr><td>電話番号：' + this.phoneNumber + '</td></tr></table></font></div>';
+
+        msg.setHtml(labelhtml);
+        msg.moveLatLon(new ZDC.LatLon(this.latlon.lat, this.latlon.lon));
+        msg.open();
+    };
+
+    function markerDelete(){
+        /* マーカを削除 */
+        while(arrmrk.length > 0){
+            map.removeWidget(arrmrk.shift());
+        }
+        /* 吹き出しを閉じる */
+        msg.close();
+    };
+
+    /* クリックした地点の緯度経度を表示する */
+    function getClickLatLon() {
+        var latlon =  map.getClickLatLon();
+        //alert('緯度：' + latlon.lat + ' 経度：' + latlon.lon);
+        var level = document.getElementById("level").value;
+        var zone = GeoHex.getZoneByLocation(latlon.lat, latlon.lon, parseInt(level));
+        //alert(zone.code);
+        zone.drawHex(map, {linecolor:"#FF0000",fillcolor:"#FF8a00",popinfo:1});
+
+    };
+
+
+
+//]]>
+</script>
+</head>
+
+<body onload="loadMap();">
+    <div id="ZMap" style="border:1px solid #777777; width:800px; height:600px; top:10px; left:20px; position:absolute;"></div>
+    <div id="IBox" style="top:0px; left:840px; position:absolute;">
+        検索語：<input id="searchWord" type="textbox"><br>
+        <input type="button" value="検索実行" onclick="exec();"><br>
+        <input type="button" value="結果削除" onclick="markerDelete();">
+        <br/>
+        <br/>
+        GeoHexのレベル：<input type="range" id="level" name="num" min="1" max="12" step="1" value="8">
+    </div>
+
+    <div style="width:100%;background-color:#000000;border-bottom:1px solid #999999;height:24px;position:absolute;z-index:10;bottom:0px;left:0px;filter:alpha(opacity=90);-moz-opacity:0.90;opacity:0.90;color:#ffffff;font-size:11px;font-family:sans-serif;"><div style="margin:5px;" id="copy">Copyright &copy;&nbsp;&nbsp;<a  style="text-decoration:none;" href="http://geogames.net/">geogames.net</a><div id="sb" style="float:right;font-size:11px;"><span xmlns:dc="http://purl.org/dc/elements/1.1/" property="dc:title">GeoHex</span> by <a xmlns:cc="http://creativecommons.org/ns#" href="http://geogames.net" property="cc:attributionName" rel="cc:attributionURL">sa2da</a> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-sa/2.1/jp/">Creative Commons 表示-継承 2.1 日本 License</a>.<a rel="license" href="http://creativecommons.org/licenses/by-sa/2.1/jp/"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-sa/2.1/jp/80x15.png" /></a></div></div></div> 
+</body>
+</html>
